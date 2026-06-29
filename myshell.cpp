@@ -2,6 +2,7 @@
 #include<string>
 #include<vector>
 #include<sstream>
+#include<cstring>
 #include<unistd.h>
 #include<sys/types.h>
 #include<sys/wait.h>
@@ -37,8 +38,29 @@ vector<const char*> make_args(const vector<string>& tokens){
     return args;
 }
 
+int sh_cd(const vector<const char*>& args){
+    if(args.size() < 2){
+        cerr << "psh: cd: missing argument\n";
+        return 1; // continue the loop
+    }
 
-int sh_execute(const vector<const char*>& args){ //concurrent execution of processes
+    if(chdir(args[1]) != 0){
+        perror("psh");
+    }
+
+    return 1; // continue the loop
+}
+
+int sh_help(const vector<const char*>& args){
+    cout << "psh: a simple shell implementation\n";
+    cout << "Built-in commands:\n";
+    cout << "  cd <directory> : change the current directory\n";
+    cout << "  help           : display this help message\n";
+    cout << "  exit           : exit the shell\n";
+    return 1; // continue the loop
+}
+
+int sh_nonbuiltin(const vector<const char*>& args){ //parallel execution of processes
     pid_t pid;
     int status;
 
@@ -52,11 +74,28 @@ int sh_execute(const vector<const char*>& args){ //concurrent execution of proce
         perror("psh");
     }else { //parent process
         do{
-            waitpid(pid, &status, WUNTRACED);
+            waitpid(pid, &status, WUNTRACED);  //study WUNTRACED flag.
         }while(!WIFEXITED(status) && !WIFSIGNALED(status));
     }
-    return 0;
+    return 1; // continue the loop
 }
+
+int sh_execute(const vector<const char*>& args){
+    if(args.empty()){
+        return 1; // empty command, continue the loop
+    }
+
+    if(strcmp(args[0], "exit") == 0){
+        return 0; // exit the shell
+    }else if(strcmp(args[0], "cd") == 0){
+        return sh_cd(args);
+    }else if(strcmp(args[0], "help") == 0){
+        return sh_help(args);
+    }
+
+    return sh_nonbuiltin(args);
+}
+
 
 void sh_loop(){
     string line;
@@ -124,5 +163,18 @@ Let's delve into implementation and be more specific to the shell.
     10.1. we can use fork() function to create a child process.
     10.2. we can use execvp() function to execute the command in the child process.
     10.3. we can use waitpid() function to wait for the child process to finish executing before the parent process continues to accept more commands from the user.
+    10.4. parallel excution of child & parent process.
+    10.5. wake up parent when child process is stopped. (WUNTRACED flag)
+    10.6. add built-in commands like cd, exit, etc. in the parent process before calling execvp() function.
+    10.7. handle the case when the user enters an empty command or a command that does not exist.
+11. add support for built-in commands like cd, exit, etc. in the parent process before calling execvp() function.
+    11.1. we can use strcmp() function to compare the command with the built-in commands.
+    11.2. we can use chdir() wrapper to change directory
+    11.3. check the argument 1 for cd command and handle the case when the user does not provide any argument.
+    11.4. return 1 to continue the loop after executing the built-in command.
+    11.5. only for exit command we will return 0 to exit the shell.
+    11.6. we can use perror() function to print the error message when the command does not exist or when the user does not have permission to execute the command.
+
+# we opt with char* instead of string because execvp() requires char* const* as its second argument.
 
 */
